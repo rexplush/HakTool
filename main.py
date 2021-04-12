@@ -4,7 +4,6 @@ import colorama
 from colorama import Fore
 import re
 import scapy.all as scapy
-import packet_injection
 import time
 import shutil
 from datetime import datetime
