@@ -9,6 +9,8 @@ import shutil
 from datetime import datetime
 import optparse
 import csv
+import socket
+import ipaddress
 
 parser = optparse.OptionParser()
 parser.add_option("-i", dest="interface", help="Used to to specify interface ** it's a mandatory command **")
@@ -17,9 +19,10 @@ parser.add_option("--cmac", dest="cmac1", help="Used to change MAC Address of th
 parser.add_option("--mon", dest="mon1", help="Used to change the mode of interface to monitor and type Y to continue")
 parser.add_option("--man", dest="man1", help="Used To change the mode of interface to managed and type Y to continue")
 parser.add_option("--pis", dest="pis1", help="Used to check packet injection support on interface and type Y to continue")
-parser.add_option("--scan", dest="scan1", help="Used to run DOS Attack and type Y to continue")
+parser.add_option("--scan", dest="scan1", help="Used to scan devices on locale subnet and type Y to continue")
 parser.add_option("--deauth", dest="deauth", help="Used to run DOS Attack")
 parser.add_option("--info", dest="info1", help="Get's you all info and type Y to continue")
+parser.add_option("--ps", dest="port_scanner", help="Help's you to scan Port's of an ip address")
 (options, arguments) = parser.parse_args()
 interface = options.interface
 cip1 = options.cip1
@@ -30,13 +33,14 @@ scan1 = options.scan1
 pis1 = options.pis1
 info1 = options.info1
 deauth1 = options.deauth
+ps = options.port_scanner
 
 colorama.init(autoreset=True)
 
 if not 'SUDO_UID' in os.environ.keys():
     print("Try running this program with sudo.")
     exit()
-cmdlist = ["mon", "pis", "man", "interface", "info", "cmac", "cip", "list", "help", "scan","exit"]
+cmdlist = ["mon", "pis", "man", "interface", "info", "cmac", "cip", "list", "help", "scan","exit", "portscanner", "ps"]
 
 if interface == None:
     print("Use '-i' and specify interface.")
@@ -236,6 +240,40 @@ def deauth():
         print("Stop monitoring mode")
         subprocess.run(["airmon-ng", "stop", hacknic + "mon"])
         print("Thank you! Exiting now")
+def portscanner(ip_add_entered):
+    port_range_pattern = re.compile("([0-9]+)-([0-9]+)")
+    port_min = 0
+    port_max = 65535
+
+    open_ports = []
+    while True:
+        try:
+            ip_address_obj = ipaddress.ip_address(ip_add_entered)
+            print("You entered a valid ip address.")
+            break
+        except:
+            print("You entered an invalid ip address")
+
+    while True:
+        print("Please enter the range of ports you want to scan in format: <int>-<int> (ex would be 60-120)")
+        port_range = input("Enter port range: ")
+        port_range_valid = port_range_pattern.search(port_range.replace(" ", ""))
+        if port_range_valid:
+            port_min = int(port_range_valid.group(1))
+            port_max = int(port_range_valid.group(2))
+            break
+    for port in range(port_min, port_max + 1):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                s.connect((ip_add_entered, port))
+                open_ports.append(port)
+
+        except:
+            pass
+
+    for port in open_ports:
+        print(f"Port {port} is open on {ip_add_entered}.")
 def help():
     help = Fore.CYAN + """
 Command 			    Ussage
@@ -255,6 +293,8 @@ cmac			    Changes MAC Address
 cip				    Changes IP Address
 
 scan                scans all the clients on the network
+
+ps                  Used for Scanning port for a ip address or a link
 
 exit                Exit the program
 """
@@ -303,6 +343,9 @@ def command_line():
         command_line()
     if command == "exit":
         quit()
+    if command == "ps":
+        target = input("Enter a I.P to scan:\n")
+        portscanner(target)
 if cip1 != None:
     cip(interface, cip1)
     quit()
@@ -326,6 +369,9 @@ elif scan1 != None:
     quit()
 elif deauth == None:
     deauth()
+    quit()
+elif ps != None:
+    portscanner(ps)
     quit()
 logo()
 command_line()
