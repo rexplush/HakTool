@@ -21,3 +21,7 @@ Used to operate very basic works and doing attacksloke
 ** You can run it without command line arguments.**
 Run program by typing "sudo python3 main.py -i {specify interface}"
 Then type "list" or "help" to get a list of commands to run
+
+# Important things to do
+1.Before running script install requirments by running "pip -r requirments.txt"
+2.Use "python3 main.py -i {specify interface}" and then run it
