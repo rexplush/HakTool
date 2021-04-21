@@ -9,6 +9,9 @@ import shutil
 from datetime import datetime
 import optparse
 import csv
+import socket
+import tkinter
+import ipaddress
 
 parser = optparse.OptionParser()
 parser.add_option("-i", dest="interface", help="Used to to specify interface ** it's a mandatory command **")
@@ -17,9 +20,10 @@ parser.add_option("--cmac", dest="cmac1", help="Used to change MAC Address of th
 parser.add_option("--mon", dest="mon1", help="Used to change the mode of interface to monitor and type Y to continue")
 parser.add_option("--man", dest="man1", help="Used To change the mode of interface to managed and type Y to continue")
 parser.add_option("--pis", dest="pis1", help="Used to check packet injection support on interface and type Y to continue")
-parser.add_option("--scan", dest="scan1", help="Used to run DOS Attack and type Y to continue")
+parser.add_option("--scan", dest="scan1", help="Used to scan devices on locale subnet and type Y to continue")
 parser.add_option("--deauth", dest="deauth", help="Used to run DOS Attack")
 parser.add_option("--info", dest="info1", help="Get's you all info and type Y to continue")
+parser.add_option("--ps", dest="port_scanner", help="Help's you to scan Port's of an ip address")
 (options, arguments) = parser.parse_args()
 interface = options.interface
 cip1 = options.cip1
@@ -30,13 +34,13 @@ scan1 = options.scan1
 pis1 = options.pis1
 info1 = options.info1
 deauth1 = options.deauth
-
+ps = options.port_scanner
 colorama.init(autoreset=True)
 
 if not 'SUDO_UID' in os.environ.keys():
     print("Try running this program with sudo.")
     exit()
-cmdlist = ["mon", "pis", "man", "interface", "info", "cmac", "cip", "list", "help", "scan","exit"]
+cmdlist = ["mon", "pis", "man", "interface", "info", "cmac", "cip", "list", "help", "scan","exit", "portscanner", "ps", "vulscan", "vs", "pfe"]
 
 if interface == None:
     print("Use '-i' and specify interface.")
@@ -45,35 +49,40 @@ interface1 = str(interface) + "mon"
 def logo():
     print(Fore.RED + r"""
     
-  ____           ____  _           _     
- |  _ \ _____  _|  _ \| |_   _ ___| |__  
- | |_) / _ \ \/ / |_) | | | | / __| '_ \ 
- |  _ <  __/>  <|  __/| | |_| \__ \ | | |
- |_| \_\___/_/\_\_|   |_|\__,_|___/_| |_|
+ ____           ____  _           _     
+|  _ \ _____  _|  _ \| |_   _ ___| |__  
+| |_) / _ \ \/ / |_) | | | | / __| '_ \ 
+|  _ <  __/>  <|  __/| | |_| \__ \ | | |
+|_| \_\___/_/\_\_|   |_|\__,_|___/_| |_|
                                          
 
     """)
-def info(interface):
-    def infowlan(interface):
-        command = subprocess.run("ifconfig " + interface, capture_output=True, shell=True).stdout.decode()
-        commandf = subprocess.run("iwconfig " + interface, capture_output=True, shell=True).stdout.decode()
-        mac = re.search(r"\w\w:\w\w:\w\w:\w\w:\w\w:\w\w", command)
-        mode = re.search(r"Mode:\D\D\D\D\D\D\D", commandf)
-        frequency = re.search(r"Frequency:\w.\w\w\w", commandf)
-        print(Fore.GREEN + "MAC Adress: " + mac.group(0))
-        print(Fore.CYAN + str(mode.group(0)))
-        print(Fore.BLUE + str(frequency.group(0)) + " GHz")
-
-    def infoeth(interface):
-        command = subprocess.run("ifconfig " + interface, capture_output=True, shell=True).stdout.decode()
-        commandf = subprocess.run("iwconfig " + interface, capture_output=True, shell=True).stdout.decode()
-        mac = re.search(r"\w\w:\w\w:\w\w:\w\w:\w\w:\w\w", command)
-        print(Fore.GREEN + "MAC Adress: " + mac.group(0))
-
-    if "eth" in interface:
-        infoeth(interface)
-    if 'wlan' in interface:
-        infowlan(interface)
+def info():
+    cmd = subprocess.run(f"ifconfig {interface}", shell=True, capture_output=True).stdout.decode()
+    macst1 = re.search("ether \w\w:\w\w:\w\w:\w\w:\w\w:\w\w", cmd)
+    print(macst1.group(0))
+    def monspec():
+        cmd = subprocess.run("sudo airmon-ng start " + interface, shell=True, capture_output=True).stdout.decode()
+        cmd1 = subprocess.run("iwconfig " + interface1, shell=True, capture_output=True).stdout.decode()
+        mode = re.search(r"Mode:\w\w\w\w\w\w\w", cmd1)
+        if "Mode:Monitor" in str(mode):
+            print(Fore.GREEN + "Monitor mode is working!")
+        else:
+            print(Fore.RED + "Monitor mode doesn't support ")
+    def man(interface):
+        cmd = subprocess.run("sudo airmon-ng stop " + interface1, shell=True, capture_output=True)
+    monspec()
+    injection = subprocess.run(f"aireplay-ng --test {interface1}", shell=True, capture_output=True).stdout.decode()
+    if "Injection is working!" in str(injection):
+        print(Fore.GREEN + "Packet injection is supported")
+    else:
+        print(Fore.RED + "Packet injection is not supported")
+    cmd = subprocess.run(f"iwlist {interface} freq", shell=True, capture_output=True).stdout.decode()
+    if "5.2 GHz" in cmd:
+        print(Fore.CYAN + "2.4 & 5Ghz is supported")
+    else:
+        print(Fore.CYAN + "2.4 GHz is only supported")
+    man(interface)
 def pis(interface, interface1):
     def mon(interface):
         cmd = subprocess.run("sudo airmon-ng start " + interface, shell=True, capture_output=True).stdout.decode()
@@ -236,15 +245,49 @@ def deauth():
         print("Stop monitoring mode")
         subprocess.run(["airmon-ng", "stop", hacknic + "mon"])
         print("Thank you! Exiting now")
+def portscanner(ip_add_entered):
+    port_range_pattern = re.compile("([0-9]+)-([0-9]+)")
+    port_min = 0
+    port_max = 65535
+
+    open_ports = []
+    while True:
+        try:
+            ip_address_obj = ipaddress.ip_address(ip_add_entered)
+            print("You entered a valid ip address.")
+            break
+        except:
+            print("You entered an invalid ip address")
+
+    while True:
+        print("Please enter the range of ports you want to scan in format: <int>-<int> (ex would be 60-120)")
+        port_range = input("Enter port range: ")
+        port_range_valid = port_range_pattern.search(port_range.replace(" ", ""))
+        if port_range_valid:
+            port_min = int(port_range_valid.group(1))
+            port_max = int(port_range_valid.group(2))
+            break
+    for port in range(port_min, port_max + 1):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                s.connect((ip_add_entered, port))
+                open_ports.append(port)
+
+        except:
+            pass
+
+    for port in open_ports:
+        print(f"Port {port} is open on {ip_add_entered}.")
 def help():
     help = Fore.CYAN + """
 Command 			    Ussage
 
-mon				    Changes interface mode to monitor
+mon			    Changes interface mode to monitor
 
 pis 			    Checks for Packet injection support
 
-man				    Changes interface mode to managed
+man			    Changes interface mode to managed
 
 interface		    Changes interface
 
@@ -252,11 +295,13 @@ info 			    Gets info of given interface
 
 cmac			    Changes MAC Address
 
-cip				    Changes IP Address
+cip			    Changes IP Address
 
-scan                scans all the clients on the network
+scan                	    Scans all the clients on the network
 
-exit                Exit the program
+ps                 	    Used for Scanning port for a ip address or a link
+
+exit                	    Exit the program
 """
     print(help)
 def quit():
@@ -270,7 +315,7 @@ def command_line():
         mon(interface)
         command_line()
     if command == "pis":
-        packet_injection.pis(interface, interface1)
+        pis(interface, interface1)
         command_line()
     if command == "man":
         man(interface)
@@ -279,7 +324,7 @@ def command_line():
         interface()
         command_line()
     if command == "info":
-        info1(interface)
+        info()
         command_line()
     if command == "cmac":
         new_mac = input("Enter a new mac address:")
@@ -303,6 +348,9 @@ def command_line():
         command_line()
     if command == "exit":
         quit()
+    if command == "ps":
+        target = input("Enter a I.P to scan:\n")
+        portscanner(target)
 if cip1 != None:
     cip(interface, cip1)
     quit()
@@ -319,7 +367,7 @@ elif pis1 == "Y":
     pis(interface, interface1)
     quit()
 elif info1 == "Y":
-    info(interface)
+    info()
     quit()
 elif scan1 != None:
     scan(scan1)
@@ -327,10 +375,11 @@ elif scan1 != None:
 elif deauth == None:
     deauth()
     quit()
-logo()
-command_line()
+elif ps != None:
+    portscanner(ps)
+    quit()
 try:
-    command_line()
     logo()
+    command_line()
 except KeyboardInterrupt:
-    print(Fore.GREEN + "\nGoodBye!\n")
+    print(Fore.YELLOW + "\nGoodBye\n")
